@@ -21,7 +21,7 @@ Future getData() async {
   var answer = await gemini.generateFromText(q);
 
   var output = answer.text;
-  print(output);
+
   response.insert(0, output);
 
   return output;
@@ -35,8 +35,11 @@ class MyApp extends StatefulWidget {
 }
 
 var path = "null";
+var img = null;
+var qu = null;
 
 class _MyAppState extends State<MyApp> {
+  var userimage = [];
   Widget build(context) {
     return Scaffold(
         backgroundColor: Colors.brown[100],
@@ -55,7 +58,9 @@ class _MyAppState extends State<MyApp> {
                 height: 40,
                 width: 50,
               ),
-              Text("Machine Mind", style: GoogleFonts.bayon()),
+              Text("Machine Mind",
+                  style: GoogleFonts.bayon(
+                      textStyle: TextStyle(color: Colors.white))),
             ],
           ),
           centerTitle: true,
@@ -74,7 +79,9 @@ class _MyAppState extends State<MyApp> {
                         return Container(
                           alignment: response[index][0] == "_"
                               ? Alignment.centerRight
-                              : Alignment.centerLeft,
+                              : response[index][0] == "+"
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
                           child: Padding(
                             padding: const EdgeInsets.all(8.0),
                             child: Container(
@@ -82,21 +89,34 @@ class _MyAppState extends State<MyApp> {
                                 decoration: BoxDecoration(
                                     color: response[index][0] == "_"
                                         ? Colors.orange[300]
-                                        : Colors.green[300],
+                                        : response[index][0] == "+"
+                                            ? Colors.orange[300]
+                                            : Colors.green[300],
                                     borderRadius: response[index][0] == "_"
                                         ? const BorderRadius.only(
                                             topLeft: Radius.circular(20),
                                             bottomLeft: Radius.circular(20),
                                             topRight: Radius.circular(20))
-                                        : const BorderRadius.only(
-                                            topLeft: Radius.circular(20),
-                                            bottomRight: Radius.circular(20),
-                                            topRight: Radius.circular(20))),
+                                        : response[index][0] == "+"
+                                            ? const BorderRadius.only(
+                                                topLeft: Radius.circular(20),
+                                                bottomLeft: Radius.circular(20),
+                                                topRight: Radius.circular(20))
+                                            : const BorderRadius.only(
+                                                topLeft: Radius.circular(20),
+                                                bottomRight:
+                                                    Radius.circular(20),
+                                                topRight: Radius.circular(20))),
                                 child: Padding(
                                   padding: const EdgeInsets.all(8.0),
-                                  child: SelectableText(
-                                    response[index],
-                                  ),
+                                  child: response[index][0] == "+"
+                                      ? Image.file(File(path))
+                                      : response[index][0] == "_"
+                                          ? SelectableText(
+                                              response[index].substring(1))
+                                          : SelectableText(
+                                              response[index],
+                                            ),
                                 )),
                           ),
                         );
@@ -123,16 +143,100 @@ class _MyAppState extends State<MyApp> {
                   ),
                   IconButton(
                       onPressed: () {
-                        setState(() {
-                          q = query.text;
-                          query.clear();
-                          response.insert(0, "_" + q);
-                        });
+                        showDialog(
+                            context: context,
+                            builder: (context) {
+                              var control = TextEditingController();
+                              return AlertDialog(
+                                content: Container(
+                                  height: 500,
+                                  width: 500,
+                                  child: StatefulBuilder(
+                                      builder: (context, state) {
+                                    return Center(
+                                        child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        TextButton(
+                                            onPressed: () async {
+                                              var image = await ImagePicker()
+                                                  .pickImage(
+                                                      source:
+                                                          ImageSource.gallery);
+                                              state(() => path = image!.path);
+                                            },
+                                            child: Text("Choose From Gallery")),
+                                        TextButton(
+                                            onPressed: () async {
+                                              var image = await ImagePicker()
+                                                  .pickImage(
+                                                      source:
+                                                          ImageSource.camera);
+                                              state(() => path = image!.path);
+                                            },
+                                            child: Text("Choose From camera")),
+                                        SizedBox(
+                                          height: 10,
+                                        ),
+                                        path != "null"
+                                            ? Image.file(
+                                                File(path),
+                                                height: 100,
+                                                width: 100,
+                                              )
+                                            : Text("^SELECT IMAGE"),
+                                        TextField(
+                                          controller: control,
+                                          decoration: InputDecoration(
+                                              hintText: "Enter Prompt",
+                                              border: OutlineInputBorder()),
+                                        ),
+                                        ElevatedButton(
+                                            onPressed: () async {
+                                              var gemini = GoogleGemini(
+                                                  apiKey:
+                                                      "AIzaSyC_ac0zd8AYxrgAyXOlVteBX12_P2hEHg8");
+                                              var re = await gemini
+                                                  .generateFromTextAndImages(
+                                                      query: control.text,
+                                                      image: File(path));
+                                              var o = re.text;
+
+                                              setState(() {
+                                                response.insert(
+                                                    0,
+                                                    "+" +
+                                                        File(path).toString());
+                                                response.insert(0, o);
+
+                                                response.insert(
+                                                    1, "_" + control.text);
+                                              });
+                                              Navigator.pop(context);
+                                            },
+                                            child: Text("Submit"))
+                                      ],
+                                    ));
+                                  }),
+                                ),
+                              );
+                            });
                       },
-                      icon: const Icon(
-                        Icons.send,
-                        color: Colors.deepPurpleAccent,
-                      ))
+                      icon: Icon(Icons.camera_alt_outlined)),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        q = query.text;
+                        query.clear();
+                        response.insert(0, "_" + q);
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.send,
+                      color: Colors.deepPurpleAccent,
+                    ),
+                  )
                 ],
               ),
             )
